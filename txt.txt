@@ -1,0 +1,422 @@
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:Pet_Gardin/photo.dart';
+
+class Profile extends StatefulWidget {
+  const Profile({super.key});
+
+  @override
+  State<Profile> createState() => _ProfileState();
+}
+
+class _ProfileState extends State<Profile> {
+  bool edit = false;
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
+  bool showPassword = false;
+  File? _image;
+
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Load user data
+    // _loadUserProfile();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _usernameController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      edit = !edit;
+    });
+  }
+
+  void _togglePasswordVisibility() {
+    setState(() {
+      showPassword = !showPassword;
+    });
+  }
+
+  void _openBottomSheet() {
+    scaffoldKey.currentState!.showBottomSheet(
+      (context) => ChangeProfilePictureSheet(
+        onImagePicked: (File image) {
+          setState(() {
+            _image = image;
+          });
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: scaffoldKey,
+      resizeToAvoidBottomInset: true,
+      appBar: ProfileAppBar(
+        isEditing: edit,
+        onEditToggle: _toggleEditMode,
+      ),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: ProfileBody(
+          image: _image,
+          controllers: {
+            'Username': _usernameController,
+            'E-Mail': _emailController,
+            'Phone': _phoneController,
+            'Password': _passwordController,
+          },
+          isEditing: edit,
+          showPassword: showPassword,
+          onPasswordVisibilityToggle: _togglePasswordVisibility,
+          onOpenBottomSheet: _openBottomSheet,
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final bool isEditing;
+  final VoidCallback onEditToggle;
+
+  const ProfileAppBar({
+    Key? key,
+    required this.isEditing,
+    required this.onEditToggle,
+  }) : super(key: key);
+
+  @override
+  Size get preferredSize => const Size.fromHeight(100);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      toolbarHeight: preferredSize.height,
+      title: const Text("Edit Profile"),
+      titleTextStyle: const TextStyle(
+        fontWeight: FontWeight.bold,
+        color: Color(0xff52796f),
+        fontSize: 25,
+      ),
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+        icon: const Icon(Icons.arrow_back),
+        color: const Color(0xff52796f),
+        iconSize: 25,
+      ),
+      centerTitle: true,
+      actions: [
+        IconButton(
+          onPressed: onEditToggle,
+          icon: Icon(isEditing ? Icons.check : Icons.edit),
+          color: const Color(0xff52796f),
+        ),
+      ],
+    );
+  }
+}
+
+class ProfileBody extends StatelessWidget {
+  final File? image;
+  final Map<String, TextEditingController> controllers;
+  final bool isEditing;
+  final bool showPassword;
+  final VoidCallback onPasswordVisibilityToggle;
+  final VoidCallback onOpenBottomSheet;
+
+  const ProfileBody({
+    Key? key,
+    required this.image,
+    required this.controllers,
+    required this.isEditing,
+    required this.showPassword,
+    required this.onPasswordVisibilityToggle,
+    required this.onOpenBottomSheet,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: MediaQuery.of(context).size.height,
+      ),
+      child: IntrinsicHeight(
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xff52796f),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(30),
+              topRight: Radius.circular(30),
+            ),
+          ),
+          padding: const EdgeInsets.all(20),
+          height: double.infinity,
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ProfilePicture(
+                image: image,
+                onOpenBottomSheet: onOpenBottomSheet,
+              ),
+              const SizedBox(height: 30),
+              for (String title in controllers.keys) ...[
+                ProfileFieldTitle(title: title),
+                CustomTextField(
+                  controller: controllers[title]!,
+                  enabled: isEditing,
+                  obscureText: title == 'Password',
+                  showPassword: showPassword,
+                  hintText: title.toUpperCase(),
+                  icon: _getIconForField(title),
+                  onVisibilityToggle:
+                      title == 'Password' ? onPasswordVisibilityToggle : null,
+                ),
+                const SizedBox(height: 30),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForField(String fieldName) {
+    switch (fieldName) {
+      case 'Username':
+        return Icons.person;
+      case 'E-Mail':
+        return Icons.mail;
+      case 'Phone':
+        return Icons.phone;
+      case 'Password':
+        return Icons.password_rounded;
+      default:
+        return Icons.text_fields;
+    }
+  }
+}
+
+class ProfileFieldTitle extends StatelessWidget {
+  final String title;
+
+  const ProfileFieldTitle({Key? key, required this.title}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFFFFCBA4),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+class CustomTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+  final bool obscureText;
+  final String hintText;
+  final IconData icon;
+  final bool showPassword;
+  final VoidCallback? onVisibilityToggle;
+
+  const CustomTextField({
+    Key? key,
+    required this.controller,
+    required this.enabled,
+    this.obscureText = false,
+    required this.hintText,
+    required this.icon,
+    this.showPassword = false,
+    this.onVisibilityToggle,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      obscureText: obscureText && !showPassword,
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        color: Color(0xffcad2c5),
+      ),
+      cursorColor: const Color(0xFFFFCBA4),
+      decoration: InputDecoration(
+        suffixIcon: obscureText
+            ? IconButton(
+                onPressed: onVisibilityToggle,
+                icon: showPassword
+                    ? const Icon(Icons.visibility_off)
+                    : const Icon(Icons.remove_red_eye),
+              )
+            : null,
+        icon: Icon(icon),
+        iconColor: const Color(0xFFFFCBA4),
+        hintText: hintText,
+        labelStyle: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFFFFCBA4),
+        ),
+        hintStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xffcad2c5),
+        ),
+        contentPadding: const EdgeInsets.all(5),
+        focusColor: const Color(0xFFFFCBA4),
+        border: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xffcad2c5), width: 2),
+        ),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(
+            color: Color(0xFFFFCBA4),
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ProfilePicture extends StatelessWidget {
+  final File? image;
+  final VoidCallback onOpenBottomSheet;
+
+  const ProfilePicture({Key? key, required this.image, required this.onOpenBottomSheet})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.bottomRight,
+      children: [
+        InkWell(
+          onTap: () {
+            if (image != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      Photo(imageurl: image!.path),
+                ),
+              );
+            }
+          },
+          child: Container(
+            height: 120,
+            width: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(
+                color: const Color(0xff52796f),
+                width: 4,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 100,
+              backgroundImage: image != null
+                  ? FileImage(image!)
+                  : const AssetImage("assets/images/userphoto.jpeg")
+                      as ImageProvider,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: onOpenBottomSheet,
+          icon: const Icon(Icons.add_circle),
+          iconSize: 35,
+          color: const Color(0xff52796f),
+        ),
+      ],
+    );
+  }
+}
+
+class ChangeProfilePictureSheet extends StatelessWidget {
+  final Function(File) onImagePicked;
+
+  const ChangeProfilePictureSheet({Key? key, required this.onImagePicked})
+      : super(key: key);
+
+  Future<void> _pickImage(BuildContext context, ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+
+    if (pickedFile != null) {
+      onImagePicked(File(pickedFile.path));
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      color: const Color(0xff52796f),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: () => _pickImage(context, ImageSource.camera),
+                icon: const Icon(Icons.camera_alt),
+                color: Colors.white,
+                iconSize: 35,
+              ),
+              const Text(
+                "Camera",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: () => _pickImage(context, ImageSource.gallery),
+                icon: const Icon(Icons.photo_library),
+                color: Colors.white,
+                iconSize: 35,
+              ),
+              const Text(
+                "Gallery",
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+          
+        ],
+      ),
+    );
+  }
+}
